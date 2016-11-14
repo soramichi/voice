@@ -1,4 +1,5 @@
 import pickle
+import os
 import numpy as np
 from chainer import cuda, Variable, FunctionSet, optimizers
 import chainer.functions as F
@@ -18,17 +19,32 @@ def forward(model, x_data, y_data, train=True, filename=None):
 
     return F.softmax_cross_entropy(y, t), F.accuracy(y, t)
 
-def load_data(filename, N):
-    f = open(filename, "r")
-    data = []
-    filenames = []
+def load_data(dir, N_train_per_file, N_test_per_file):
+    batches = os.listdir(dir)
+    data_train, data_test = [], []
+    labels_train, labels_test = [], []
+    f_train, f_test = [], []
 
-    for i in range(0, N):
-        v = f.readline().strip().split(",")
-        filenames.append(v[0])
-        data.append(np.array(list(map(float, v[1:])), ndmin=2).astype(np.float32))
+    for n in range(0, len(batches)):
+        # f must have at least (N_train + N_test) lines
+        f = open(dir + "/" + batches[n], "r")
+        label = n
 
-    return data, filenames
+        # for training
+        for i in range(0, N_train_per_file):
+            v = f.readline().strip().split(",")
+            f_train.append(v[0])
+            data_train.append(np.array(list(map(float, v[1:])), ndmin=2).astype(np.float32))
+            labels_train += [label]
+
+        # for test
+        for i in range(0, N_test_per_file):
+            v = f.readline().strip().split(",")
+            f_test.append(v[0])
+            data_test.append(np.array(list(map(float, v[1:])), ndmin=2).astype(np.float32))
+            labels_test += [label]
+
+    return np.array(data_train, ndmin=3), np.array(data_test, ndmin=3), np.array(labels_train).astype(np.int32), np.array(labels_test).astype(np.int32), f_train, f_test
 
 def main():
     # global setting
@@ -36,20 +52,13 @@ def main():
     reload_model = False
     n_epoch = 3
     batchsize = 10
-    #N_train = 180
-    #N_test = 20
-    N_train = 90
-    N_test = 20
-    
-    data_ai, files_ai = load_data("./data/ai.batch", N_train + N_test)
-    data_kugi, files_kugi  = load_data("./data/kugi.batch", N_train + N_test)
-    x_train = np.array(data_kugi[0:N_train] + data_ai[0:N_train])
-    y_train = np.array([0] * N_train + [1] * N_train).astype(np.int32) # kugi:0, ai:1
-    files_train = files_kugi[0:N_train] + files_ai[0:N_train]
-    x_test = np.array(data_kugi[N_train:] + data_ai[N_train:])
-    y_test = np.array([0] * N_test + [1] * N_test).astype(np.int32)
-    files_test = files_kugi[N_train:] + files_ai[N_train:]
-    
+    N_train_per_file = 90
+    N_test_per_file = 20
+
+    x_train, x_test, y_train, y_test, f_train, f_test = load_data("./data_batch", N_train_per_file, N_test_per_file)
+    N_train = len(x_train)
+    N_test = len(x_test)
+
     # setup model
     if reload_model == False:
         print("reload_model is off, learn the model from scratch")
@@ -74,12 +83,12 @@ def main():
         for epoch in range(1, n_epoch+1):
             print('epoch', epoch)
 
-            perm = np.random.permutation(2 * N_train)
+            perm = np.random.permutation(N_train)
             sum_accuracy = 0
             sum_loss = 0
 
-            for i in range(0, 2 * N_train, batchsize):
-                print("%d/%d" % (i, 2 * N_train))
+            for i in range(0, N_train, batchsize):
+                print("%d/%d" % (i, N_train))
                 
                 x_batch = x_train[perm[i:i+batchsize]]
                 y_batch = y_train[perm[i:i+batchsize]]
@@ -92,7 +101,7 @@ def main():
                 sum_loss     += float(cuda.to_cpu(loss.data)) * batchsize
                 sum_accuracy += float(cuda.to_cpu(acc.data)) * batchsize
                 
-            print('train mean loss=%f, accuracy=%f' % (sum_loss / (2 * N_train), sum_accuracy / (2 * N_train)))
+            print('train mean loss=%f, accuracy=%f' % (sum_loss / N_train, sum_accuracy / N_train))
 
         print("learning done. save the learnt model into a file")
         f_out = open(model_file, "wb")
@@ -102,16 +111,16 @@ def main():
     sum_accuracy = 0
     sum_loss     = 0
     batchsize = 1
-    for i in range(0, 2 * N_test, batchsize):
+    for i in range(0, N_test, batchsize):
         x_batch = x_test[i:i+batchsize]
         y_batch = y_test[i:i+batchsize]
 
-        loss, acc = forward(model, x_batch, y_batch, train=False, filename=files_test[i])
+        loss, acc = forward(model, x_batch, y_batch, train=False, filename=f_test[i])
 
         sum_loss     += float(cuda.to_cpu(loss.data)) * batchsize
         sum_accuracy += float(cuda.to_cpu(acc.data)) * batchsize
 
-    print('test  mean loss=%f, accuracy=%f' % (sum_loss / (2 * N_test), sum_accuracy / (2 * N_test)))
+    print('test  mean loss=%f, accuracy=%f' % (sum_loss / N_test, sum_accuracy / N_test))
 
 if __name__ == "__main__":
     main()
