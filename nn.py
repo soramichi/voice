@@ -44,7 +44,9 @@ def load_data(dir, N_train_per_file, N_test_per_file):
             data_test.append(np.array(list(map(float, v[1:])), ndmin=2).astype(np.float32))
             labels_test += [label]
 
-    return np.array(data_train, ndmin=3), np.array(data_test, ndmin=3), np.array(labels_train).astype(np.int32), np.array(labels_test).astype(np.int32), f_train, f_test
+    max_label = labels_train[-1]
+
+    return np.array(data_train, ndmin=3), np.array(data_test, ndmin=3), np.array(labels_train).astype(np.int32), np.array(labels_test).astype(np.int32), f_train, f_test, max_label
 
 def main():
     # global setting
@@ -55,7 +57,7 @@ def main():
     N_train_per_file = 90
     N_test_per_file = 20
 
-    x_train, x_test, y_train, y_test, f_train, f_test = load_data("./data_batch", N_train_per_file, N_test_per_file)
+    x_train, x_test, y_train, y_test, f_train, f_test, max_label = load_data("./data_batch", N_train_per_file, N_test_per_file)
     N_train = len(x_train)
     N_test = len(x_test)
 
@@ -68,7 +70,7 @@ def main():
                             bn2   = F.BatchNormalization(5),
                             conv3=L.ConvolutionND(1, 5, 5, 5, pad=1),
                             fl4=F.Linear(99885, 256),
-                            fl5=F.Linear(256, 2))
+                            fl5=F.Linear(256, max_label+1))
 
     else:
         print("reload_model is on, reload a given model from existing file")
