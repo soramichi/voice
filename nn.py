@@ -6,7 +6,7 @@ import chainer.functions as F
 import chainer.links as L
 import pdb
 
-def forward(model, x_data, y_data, train=True, filename=""):
+def forward(model, x_data, y_data, train=True, f_test=None):
     x, t = Variable(x_data, volatile=not train), Variable(y_data, volatile=not train)
     h = F.relu(model.bn1(model.conv1(x)))
     h = F.relu(model.bn2(model.conv2(h)))
@@ -15,22 +15,24 @@ def forward(model, x_data, y_data, train=True, filename=""):
     y = model.fl5(h)
 
     if train == False:
-        print(filename, F.accuracy(y, t).data)
+        for i in range(0, len(y.data)):
+            print(f_test[i], "o" if np.argmax(y.data[i]) == t.data[i] else "x")
 
     return F.softmax_cross_entropy(y, t), F.accuracy(y, t)
 
-def evaluate(model, x_test, y_test, f_test):
+def evaluate(model, x_test, y_test, f_test, batchsize):
     # evaluation
     sum_accuracy = 0
     sum_loss     = 0
-    for i in range(0, len(x_test)):
-        x_batch = x_test[i:i+1]
-        y_batch = y_test[i:i+1]
+    for i in range(0, len(x_test), batchsize):
+        x_batch = x_test[i:i+batchsize]
+        y_batch = y_test[i:i+batchsize]
+        f_batch = f_test[i:i+batchsize]
 
-        loss, acc = forward(model, x_batch, y_batch, False, f_test[i])
+        loss, acc = forward(model, x_batch, y_batch, False, f_batch)
 
-        sum_loss     += float(cuda.to_cpu(loss.data))
-        sum_accuracy += float(cuda.to_cpu(acc.data))
+        sum_loss     += float(cuda.to_cpu(loss.data)) * batchsize
+        sum_accuracy += float(cuda.to_cpu(acc.data)) * batchsize
 
     print('test  mean loss=%f, accuracy=%f' % (sum_loss / len(x_test), sum_accuracy / len(x_test)))
 
@@ -119,13 +121,13 @@ def main():
                 sum_accuracy += float(cuda.to_cpu(acc.data)) * batchsize
                 
             print('train mean loss=%f, accuracy=%f' % (sum_loss / N_train, sum_accuracy / N_train))
-            evaluate(model, x_test, y_test, f_test)
+            evaluate(model, x_test, y_test, f_test, batchsize)
 
         print("learning done. save the learnt model into a file")
         f_out = open(model_file, "wb")
         pickle.dump(model, f_out)
     else:
-        evaluate(model, x_test, y_test, f_test)
+        evaluate(model, x_test, y_test, f_test, batchsize)
 
 if __name__ == "__main__":
     main()
