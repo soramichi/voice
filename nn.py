@@ -6,7 +6,7 @@ import chainer.functions as F
 import chainer.links as L
 import pdb
 
-def forward(model, x_data, y_data, train=True, filename=None):
+def forward(model, x_data, y_data, train=True, filename=""):
     x, t = Variable(x_data, volatile=not train), Variable(y_data, volatile=not train)
     h = F.relu(model.bn1(model.conv1(x)))
     h = F.relu(model.bn2(model.conv2(h)))
@@ -18,6 +18,21 @@ def forward(model, x_data, y_data, train=True, filename=None):
         print(filename, F.accuracy(y, t).data)
 
     return F.softmax_cross_entropy(y, t), F.accuracy(y, t)
+
+def evaluate(model, x_test, y_test, f_test):
+    # evaluation
+    sum_accuracy = 0
+    sum_loss     = 0
+    for i in range(0, len(x_test)):
+        x_batch = x_test[i:i+1]
+        y_batch = y_test[i:i+1]
+
+        loss, acc = forward(model, x_batch, y_batch, False, f_test[i])
+
+        sum_loss     += float(cuda.to_cpu(loss.data))
+        sum_accuracy += float(cuda.to_cpu(acc.data))
+
+    print('test  mean loss=%f, accuracy=%f' % (sum_loss / len(x_test), sum_accuracy / len(x_test)))
 
 def load_data(dir, N_train_per_file, N_test_per_file):
     batches = os.listdir(dir)
@@ -104,25 +119,13 @@ def main():
                 sum_accuracy += float(cuda.to_cpu(acc.data)) * batchsize
                 
             print('train mean loss=%f, accuracy=%f' % (sum_loss / N_train, sum_accuracy / N_train))
+            evaluate(model, x_test, y_test, f_test)
 
         print("learning done. save the learnt model into a file")
         f_out = open(model_file, "wb")
         pickle.dump(model, f_out)
-    
-    # evaluation
-    sum_accuracy = 0
-    sum_loss     = 0
-    batchsize = 1
-    for i in range(0, N_test, batchsize):
-        x_batch = x_test[i:i+batchsize]
-        y_batch = y_test[i:i+batchsize]
-
-        loss, acc = forward(model, x_batch, y_batch, train=False, filename=f_test[i])
-
-        sum_loss     += float(cuda.to_cpu(loss.data)) * batchsize
-        sum_accuracy += float(cuda.to_cpu(acc.data)) * batchsize
-
-    print('test  mean loss=%f, accuracy=%f' % (sum_loss / N_test, sum_accuracy / N_test))
+    else:
+        evaluate(model, x_test, y_test, f_test)
 
 if __name__ == "__main__":
     main()
