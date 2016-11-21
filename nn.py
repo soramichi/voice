@@ -121,13 +121,13 @@ def main():
 
         # Evaluate the model with the test dataset for each epoch
         trainer.extend(extensions.Evaluator(test_iter, model))
-        # Write a log of evaluation statistics for each epoch (why this is mandatory??)
-        trainer.extend(extensions.LogReport())
+        # Write a log of evaluation statistics for each epoch
+        trainer.extend(extensions.LogReport(log_name=None))
         
         # Print a progress bar
         trainer.extend(extensions.PrintReport(
             ['epoch', 'main/loss', 'validation/main/loss',
-             'main/accuracy', 'validation/main/accuracy']))        
+             'main/accuracy', 'validation/main/accuracy']))
         trainer.extend(extensions.ProgressBar(update_interval=1))
 
         # Run the training
