@@ -4,7 +4,6 @@ import numpy as np
 from chainer import cuda, Variable, FunctionSet, optimizers
 import chainer.functions as F
 import chainer.links as L
-import pdb
 
 def forward(model, x_data, y_data, train=True, f_test=None):
     x, t = Variable(x_data, volatile=not train), Variable(y_data, volatile=not train)
