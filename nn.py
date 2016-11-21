@@ -1,12 +1,12 @@
 import pickle
 import os
 import numpy as np
-from chainer import cuda, Chain, Variable, FunctionSet, optimizers
+from chainer import cuda, Chain, Variable, FunctionSet, optimizers, datasets, iterators, training
+from chainer.training import extensions
 import chainer.functions as F
 import chainer.links as L
 
 class MLP(Chain):
-
     def __init__(self, n_out):
         super(MLP, self).__init__(
             conv1=L.ConvolutionND(1, 1, 3, 20),
@@ -74,12 +74,18 @@ def load_data(dir, N_train_per_file, N_test_per_file):
 
     return np.array(data_train, ndmin=3), np.array(data_test, ndmin=3), np.array(labels_train).astype(np.int32), np.array(labels_test).astype(np.int32), f_train, f_test, max_label
 
+def make_tuple_dataset(x, y):
+    tuples = []
+    for i in range(0, len(x)):
+        tuples.append((x[i], y[i]))
+    return tuples
+    
 def main():
     # global setting
     model_file = "./model.dat"
     reload_model = False
     n_epoch = 5
-    batchsize = 10
+    batchsize = 20
     N_train_per_file = 180
     N_test_per_file = 20
 
@@ -100,32 +106,32 @@ def main():
     optimizer = optimizers.Adam()
     optimizer.setup(model)
 
+    train = make_tuple_dataset(x_train, y_train)
+    test  = make_tuple_dataset(x_test, y_test)
+    
     # training, executed when not reload mode
     if reload_model == False:
-        for epoch in range(1, n_epoch+1):
-            print('epoch', epoch)
+        train_iter = iterators.SerialIterator(train, batchsize)
+        test_iter = iterators.SerialIterator(test, batchsize,
+                                             repeat=False, shuffle=False)
 
-            perm = np.random.permutation(N_train)
-            sum_accuracy = 0
-            sum_loss = 0
+        # Set up a trainer
+        updater = training.StandardUpdater(train_iter, optimizer)
+        trainer = training.Trainer(updater, (n_epoch, 'epoch'))
 
-            for i in range(0, N_train, batchsize):
-                print("%d/%d" % (i, N_train))
-                
-                x_batch = x_train[perm[i:i+batchsize]]
-                y_batch = y_train[perm[i:i+batchsize]]
+        # Evaluate the model with the test dataset for each epoch
+        trainer.extend(extensions.Evaluator(test_iter, model))
+        # Write a log of evaluation statistics for each epoch (why this is mandatory??)
+        trainer.extend(extensions.LogReport())
+        
+        # Print a progress bar
+        trainer.extend(extensions.PrintReport(
+            ['epoch', 'main/loss', 'validation/main/loss',
+             'main/accuracy', 'validation/main/accuracy']))        
+        trainer.extend(extensions.ProgressBar(update_interval=1))
 
-                optimizer.zero_grads()
-                loss = model(x_batch, y_batch)
-                #optimizer.update(model, x_batch, y_batch)
-                loss.backward()
-                optimizer.update()
-                
-                sum_loss     += float(loss.data) * batchsize
-                sum_accuracy += float(model.accuracy.data) * batchsize
-                
-            print('train mean loss=%f, accuracy=%f' % (sum_loss / N_train, sum_accuracy / N_train))
-            evaluate(model, x_test, y_test, f_test, batchsize)
+        # Run the training
+        trainer.run()
 
         print("learning done. save the learnt model into a file")
         f_out = open(model_file, "wb")
