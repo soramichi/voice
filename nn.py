@@ -1,38 +1,48 @@
 import pickle
 import os
 import numpy as np
-from chainer import cuda, Variable, FunctionSet, optimizers
+from chainer import cuda, Chain, Variable, FunctionSet, optimizers
 import chainer.functions as F
 import chainer.links as L
 
-def forward(model, x_data, y_data, train=True, f_test=None):
-    x, t = Variable(x_data, volatile=not train), Variable(y_data, volatile=not train)
-    h = F.relu(model.bn1(model.conv1(x)))
-    h = F.relu(model.bn2(model.conv2(h)))
-    h = F.relu(model.conv3(h))
-    h = F.dropout(F.relu(model.fl4(h)),train=train)
-    y = model.fl5(h)
+class MLP(Chain):
 
-    if train == False:
-        for i in range(0, len(y.data)):
-            print(f_test[i], "o" if np.argmax(y.data[i]) == t.data[i] else "x")
-
-    return F.softmax_cross_entropy(y, t), F.accuracy(y, t)
+    def __init__(self, n_out):
+        super(MLP, self).__init__(
+            conv1=L.ConvolutionND(1, 1, 3, 20),
+            bn1   = F.BatchNormalization(3),
+            conv2=L.ConvolutionND(1, 3, 5, 5, pad=1),
+            bn2   = F.BatchNormalization(5),
+            conv3=L.ConvolutionND(1, 5, 5, 5, pad=1),
+            fl4=F.Linear(99885, 256),
+            fl5=F.Linear(256, n_out)
+        )
+    def __call__(self, x):
+        h = F.relu(self.bn1(self.conv1(x)))
+        h = F.relu(self.bn2(self.conv2(h)))
+        h = F.relu(self.conv3(h))
+        h = F.dropout(F.relu(self.fl4(h)), train=self.train)
+        y = self.fl5(h)
+        return y
 
 def evaluate(model, x_test, y_test, f_test, batchsize):
     # evaluation
     sum_accuracy = 0
     sum_loss     = 0
+    model.predictor.train = False
+
     for i in range(0, len(x_test), batchsize):
         x_batch = x_test[i:i+batchsize]
         y_batch = y_test[i:i+batchsize]
         f_batch = f_test[i:i+batchsize]
 
-        loss, acc = forward(model, x_batch, y_batch, False, f_batch)
+        loss = model(x_batch, y_batch)
 
-        sum_loss     += float(cuda.to_cpu(loss.data)) * batchsize
-        sum_accuracy += float(cuda.to_cpu(acc.data)) * batchsize
+        sum_loss     += float(loss.data) * batchsize
+        sum_accuracy += float(model.accuracy.data) * batchsize
 
+    model.predictor.train = True
+        
     print('test  mean loss=%f, accuracy=%f' % (sum_loss / len(x_test), sum_accuracy / len(x_test)))
 
 def load_data(dir, N_train_per_file, N_test_per_file):
@@ -68,9 +78,9 @@ def main():
     # global setting
     model_file = "./model.dat"
     reload_model = False
-    n_epoch = 3
+    n_epoch = 5
     batchsize = 10
-    N_train_per_file = 90
+    N_train_per_file = 180
     N_test_per_file = 20
 
     x_train, x_test, y_train, y_test, f_train, f_test, max_label = load_data("./data_batch", N_train_per_file, N_test_per_file)
@@ -80,21 +90,15 @@ def main():
     # setup model
     if reload_model == False:
         print("reload_model is off, learn the model from scratch")
-        model = FunctionSet(conv1=L.ConvolutionND(1, 1, 3, 20),
-                            bn1   = F.BatchNormalization(3),
-                            conv2=L.ConvolutionND(1, 3, 5, 5, pad=1),
-                            bn2   = F.BatchNormalization(5),
-                            conv3=L.ConvolutionND(1, 5, 5, 5, pad=1),
-                            fl4=F.Linear(99885, 256),
-                            fl5=F.Linear(256, max_label+1))
-
+        model = L.Classifier(MLP(max_label + 1))
+        model.predictor.train = True
     else:
         print("reload_model is on, reload a given model from existing file")
         f_in = open(model_file, "rb")
         model = pickle.load(f_in, encoding="bytes")
 
     optimizer = optimizers.Adam()
-    optimizer.setup(model.collect_parameters())
+    optimizer.setup(model)
 
     # training, executed when not reload mode
     if reload_model == False:
@@ -112,12 +116,13 @@ def main():
                 y_batch = y_train[perm[i:i+batchsize]]
 
                 optimizer.zero_grads()
-                loss, acc = forward(model, x_batch, y_batch)
+                loss = model(x_batch, y_batch)
+                #optimizer.update(model, x_batch, y_batch)
                 loss.backward()
                 optimizer.update()
                 
-                sum_loss     += float(cuda.to_cpu(loss.data)) * batchsize
-                sum_accuracy += float(cuda.to_cpu(acc.data)) * batchsize
+                sum_loss     += float(loss.data) * batchsize
+                sum_accuracy += float(model.accuracy.data) * batchsize
                 
             print('train mean loss=%f, accuracy=%f' % (sum_loss / N_train, sum_accuracy / N_train))
             evaluate(model, x_test, y_test, f_test, batchsize)
