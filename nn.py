@@ -23,6 +23,11 @@ class MLP(Chain):
         h = F.relu(self.conv3(h))
         h = F.dropout(F.relu(self.fl4(h)), train=self.train)
         y = self.fl5(h)
+        if self.output:
+            for d in y.data: # y.data is batched
+                self.f_out.write(list(d).__str__())
+                self.f_out.write("\n")
+                self.f_out.flush()
         return y
 
 def evaluate(model, x_test, y_test, f_test, batchsize):
