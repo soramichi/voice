@@ -8,6 +8,8 @@ import chainer.links as L
 
 class MLP(Chain):
     def __init__(self, n_out):
+        self.f_out = open("./layer", "w")
+        self.output = False
         super(MLP, self).__init__(
             conv1=L.ConvolutionND(1, 1, 3, 20),
             bn1   = F.BatchNormalization(3),
@@ -29,6 +31,10 @@ class MLP(Chain):
                 self.f_out.write("\n")
                 self.f_out.flush()
         return y
+    def enable_layer_output(self):
+        self.output = True
+    def disable_layer_output(self):
+        self.output = False
 
 def evaluate(model, x_test, y_test, f_test, batchsize):
     # evaluation
@@ -134,6 +140,11 @@ def main():
             ['epoch', 'main/loss', 'validation/main/loss',
              'main/accuracy', 'validation/main/accuracy']))
         trainer.extend(extensions.ProgressBar(update_interval=1))
+
+        # set mode.train = False right before evaluation starts,
+        # then re-set it to True right after evaluation ends,
+        trainer.extend(lambda x: model.predictor.enable_layer_output(), trigger=(1, "epoch"), priority=training.extension.PRIORITY_WRITER + 1)
+        trainer.extend(lambda x: model.predictor.disable_layer_output(), trigger=(1, "epoch"), priority=training.extension.PRIORITY_READER - 1)
 
         # Run the training
         trainer.run()
