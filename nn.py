@@ -16,7 +16,7 @@ class MLP(Chain):
             conv2=L.ConvolutionND(1, 3, 5, 5, pad=1),
             bn2   = F.BatchNormalization(5),
             conv3=L.ConvolutionND(1, 5, 5, 5, pad=1),
-            fl4=F.Linear(99885, 256),
+            fl4=F.Linear(199885, 256),
             fl5=F.Linear(256, n_out)
         )
     def __call__(self, x):
