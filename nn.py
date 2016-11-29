@@ -143,8 +143,8 @@ def main():
 
         # set mode.train = False right before evaluation starts,
         # then re-set it to True right after evaluation ends,
-        trainer.extend(lambda x: model.predictor.enable_layer_output(), trigger=(1, "epoch"), priority=training.extension.PRIORITY_WRITER + 1)
-        trainer.extend(lambda x: model.predictor.disable_layer_output(), trigger=(1, "epoch"), priority=training.extension.PRIORITY_READER - 1)
+        trainer.extend(lambda x: model.predictor.enable_layer_output(), trigger=(5, "epoch"), priority=training.extension.PRIORITY_WRITER + 1)
+        trainer.extend(lambda x: model.predictor.disable_layer_output(), trigger=(5, "epoch"), priority=training.extension.PRIORITY_READER - 1)
 
         # Run the training
         trainer.run()
