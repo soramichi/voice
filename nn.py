@@ -16,20 +16,22 @@ class MLP(Chain):
             conv2=L.ConvolutionND(1, 3, 5, 5, pad=1),
             bn2   = F.BatchNormalization(5),
             conv3=L.ConvolutionND(1, 5, 5, 5, pad=1),
-            fl4=F.Linear(199885, 256),
+            fl4=F.Linear(149885, 256),
             fl5=F.Linear(256, n_out)
         )
     def __call__(self, x):
         h = F.relu(self.bn1(self.conv1(x)))
         h = F.relu(self.bn2(self.conv2(h)))
-        h = F.relu(self.conv3(h))
-        h = F.dropout(F.relu(self.fl4(h)), train=self.train)
-        y = self.fl5(h)
+        h = self.conv3(h)
         if self.output:
-            for d in y.data: # y.data is batched
-                self.f_out.write(list(d).__str__())
+            for d in h.data: # h.data is batched, d is a data vector
+                t = d.reshape(149885,)
+                self.f_out.write(list(t).__str__())
                 self.f_out.write("\n")
                 self.f_out.flush()
+        h = F.relu(h)
+        h = F.dropout(F.relu(self.fl4(h)), train=self.train)
+        y = self.fl5(h)
         return y
     def enable_layer_output(self):
         self.output = True
