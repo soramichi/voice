@@ -10,7 +10,8 @@ matplotlib.use('Agg')
 import matplotlib.pylab as plt
 """
 
-dir = "./data/ai/cut"
+base_dir = sys.argv[1]
+dir = base_dir + "/cut"
 
 filelist = os.listdir(dir)
 
