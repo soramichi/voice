@@ -27,7 +27,7 @@ for i in range(0, len(filelist)):
     x = np.frombuffer(x, dtype= "int16") / 32768.0
 
     X = np.fft.fft(x)
-    data = functools.reduce(lambda l,c: np.append(l, np.array(c.real, c.imag).astype(np.float16)), X, np.array([]))
+    data = functools.reduce(lambda l,c: np.append(l, np.array([c.real, c.imag]).astype(np.float16)), X, np.array([]))
 
     # save only up to 15kHz
     # Note: one Hz has two data elements (real and imaginary parts)
