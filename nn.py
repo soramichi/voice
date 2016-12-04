@@ -24,10 +24,6 @@ class MLP(Chain):
         h = F.dropout(F.relu(self.fl4(h)), train=self.train)
         y = self.fl5(h)
         return y
-    def enable_layer_output(self):
-        self.output = True
-    def disable_layer_output(self):
-        self.output = False
 
 def print_report(model, x_test, y_test, f_test, batchsize):
     f_out = open("./report.txt", "w")
