@@ -3,7 +3,10 @@ import sys
 import wave
 import pickle
 import functools
+from multiprocessing import Pool
 import numpy as np
+
+output_dir = "./data_batch"
 
 def get_target_dirs(base_dir = "./data"):
     dirs = os.listdir(base_dir)
@@ -25,7 +28,7 @@ def get_target_dirs(base_dir = "./data"):
 
     return targets
 
-def fft(target_dir, output_dir):
+def fft(target_dir):
     basename = target_dir.split("/")[-1]
     target_dir += "/cut"
     filelist = os.listdir(target_dir)
@@ -55,16 +58,14 @@ def fft(target_dir, output_dir):
         f_out.flush()
 
 def main():
-    data_batch_dir = "./data_batch"
-
     try:
-        s = os.stat(data_batch_dir)
+        s = os.stat(output_dir)
     except FileNotFoundError:
-        os.mkdir(data_batch_dir)
+        os.mkdir(output_dir)
 
     target_dirs = get_target_dirs()
-    for d in target_dirs:
-        fft(d, data_batch_dir)
+    p = Pool(os.cpu_count())
+    p.map(fft, target_dirs)
 
 if __name__ == "__main__":
     main()
