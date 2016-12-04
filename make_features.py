@@ -33,9 +33,6 @@ def fft(target_dir):
     target_dir += "/cut"
     filelist = os.listdir(target_dir)
 
-    print(target_dir, output_dir)
-    print(basename)
-
     f_out = open("%s/%s.batch" % (output_dir, basename), "w")
 
     for i in range(0, len(filelist)):
