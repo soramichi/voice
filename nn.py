@@ -85,10 +85,9 @@ def main():
     # global setting
     model_file = "./model.dat"
     reload_model = False
-    n_epoch = 1
+    n_epoch = 5
     batchsize = 20
-    #N_train_per_file = 180
-    N_train_per_file = 80
+    N_train_per_file = 180
     N_test_per_file = 20
 
     x_train, x_test, y_train, y_test, f_train, f_test, max_label = load_data("./data_batch", N_train_per_file, N_test_per_file)
