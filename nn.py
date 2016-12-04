@@ -29,25 +29,22 @@ class MLP(Chain):
     def disable_layer_output(self):
         self.output = False
 
-def evaluate(model, x_test, y_test, f_test, batchsize):
-    # evaluation
-    sum_accuracy = 0
-    sum_loss     = 0
-    model.predictor.train = False
+def print_report(model, x_test, y_test, f_test, batchsize):
+    f_out = open("./report.txt", "w")
+    n_correct = 0
 
     for i in range(0, len(x_test), batchsize):
         x_batch = x_test[i:i+batchsize]
         y_batch = y_test[i:i+batchsize]
         f_batch = f_test[i:i+batchsize]
 
-        loss = model(x_batch, y_batch)
+        t = model.predictor(x_batch)
+        for i in range(0, batchsize):
+            correct = (y_batch[i] == np.argmax(t.data[i]))
+            n_correct += (1 if correct else 0)
+            f_out.write("%s %c\n" % (f_batch[i], "o" if correct else "x"))
 
-        sum_loss     += float(loss.data) * batchsize
-        sum_accuracy += float(model.accuracy.data) * batchsize
-
-    model.predictor.train = True
-        
-    print('test  mean loss=%f, accuracy=%f' % (sum_loss / len(x_test), sum_accuracy / len(x_test)))
+    f_out.write("Accuracy: %d/%d = %f\n" % (n_correct, len(x_test), n_correct / len(x_test)))
 
 def load_data(dir, N_train_per_file, N_test_per_file):
     batches = os.listdir(dir)
@@ -88,9 +85,10 @@ def main():
     # global setting
     model_file = "./model.dat"
     reload_model = False
-    n_epoch = 5
+    n_epoch = 1
     batchsize = 20
-    N_train_per_file = 180
+    #N_train_per_file = 180
+    N_train_per_file = 80
     N_test_per_file = 20
 
     x_train, x_test, y_train, y_test, f_train, f_test, max_label = load_data("./data_batch", N_train_per_file, N_test_per_file)
@@ -140,6 +138,8 @@ def main():
         print("learning done. save the learnt model into a file")
         f_out = open(model_file, "wb")
         pickle.dump(model, f_out)
+
+        print_report(model, x_test, y_test, f_test, batchsize)
     else:
         evaluate(model, x_test, y_test, f_test, batchsize)
 
