@@ -83,8 +83,6 @@ def make_tuple_dataset(x, y):
     
 def main():
     # global setting
-    model_file = "./model.dat"
-    reload_model = False
     n_epoch = 5
     batchsize = 20
     N_train_per_file = 180
@@ -95,52 +93,39 @@ def main():
     N_test = len(x_test)
 
     # setup model
-    if reload_model == False:
-        print("reload_model is off, learn the model from scratch")
-        model = L.Classifier(MLP(max_label + 1))
-        model.predictor.train = True
-    else:
-        print("reload_model is on, reload a given model from existing file")
-        f_in = open(model_file, "rb")
-        model = pickle.load(f_in, encoding="bytes")
-
+    model = L.Classifier(MLP(max_label + 1))
+    model.predictor.train = True
     optimizer = optimizers.Adam()
     optimizer.setup(model)
 
     train = make_tuple_dataset(x_train, y_train)
     test  = make_tuple_dataset(x_test, y_test)
     
-    # training, executed when not reload mode
-    if reload_model == False:
-        train_iter = iterators.SerialIterator(train, batchsize)
-        test_iter = iterators.SerialIterator(test, batchsize,
-                                             repeat=False, shuffle=False)
+    # training
+    train_iter = iterators.SerialIterator(train, batchsize)
+    test_iter = iterators.SerialIterator(test, batchsize,
+                                         repeat=False, shuffle=False)
 
-        # Set up a trainer
-        updater = training.StandardUpdater(train_iter, optimizer)
-        trainer = training.Trainer(updater, (n_epoch, 'epoch'))
+    # Set up a trainer
+    updater = training.StandardUpdater(train_iter, optimizer)
+    trainer = training.Trainer(updater, (n_epoch, 'epoch'))
 
-        # Evaluate the model with the test dataset for each epoch
-        trainer.extend(extensions.Evaluator(test_iter, model))
-        # Write a log of evaluation statistics for each epoch
-        trainer.extend(extensions.LogReport(log_name=None))
+    # Evaluate the model with the test dataset for each epoch
+    trainer.extend(extensions.Evaluator(test_iter, model))
+    # Write a log of evaluation statistics for each epoch
+    trainer.extend(extensions.LogReport(log_name=None))
         
-        # Print a progress bar
-        trainer.extend(extensions.PrintReport(
-            ['epoch', 'main/loss', 'validation/main/loss',
-             'main/accuracy', 'validation/main/accuracy']))
-        trainer.extend(extensions.ProgressBar(update_interval=1))
+    # Print a progress bar
+    trainer.extend(extensions.PrintReport(
+        ['epoch', 'main/loss', 'validation/main/loss',
+         'main/accuracy', 'validation/main/accuracy']))
+    trainer.extend(extensions.ProgressBar(update_interval=1))
 
-        # Run the training
-        trainer.run()
+    # Run the training
+    trainer.run()
 
-        print("learning done. save the learnt model into a file")
-        f_out = open(model_file, "wb")
-        pickle.dump(model, f_out)
-
-        print_report(model, x_test, y_test, f_test, batchsize)
-    else:
-        evaluate(model, x_test, y_test, f_test, batchsize)
+    # output the report
+    print_report(model, x_test, y_test, f_test, batchsize)
 
 if __name__ == "__main__":
     main()
