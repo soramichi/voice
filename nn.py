@@ -8,8 +8,6 @@ import chainer.links as L
 
 class MLP(Chain):
     def __init__(self, n_out):
-        self.f_out = open("./layer", "w")
-        self.output = False
         super(MLP, self).__init__(
             conv1=L.ConvolutionND(1, 1, 3, 20),
             bn1   = F.BatchNormalization(3),
@@ -22,14 +20,7 @@ class MLP(Chain):
     def __call__(self, x):
         h = F.relu(self.bn1(self.conv1(x)))
         h = F.relu(self.bn2(self.conv2(h)))
-        h = self.conv3(h)
-        if self.output:
-            for d in h.data: # h.data is batched, d is a data vector
-                t = d.reshape(149885,)
-                self.f_out.write(list(t).__str__())
-                self.f_out.write("\n")
-                self.f_out.flush()
-        h = F.relu(h)
+        h = F.relu(self.conv3(h))
         h = F.dropout(F.relu(self.fl4(h)), train=self.train)
         y = self.fl5(h)
         return y
@@ -142,11 +133,6 @@ def main():
             ['epoch', 'main/loss', 'validation/main/loss',
              'main/accuracy', 'validation/main/accuracy']))
         trainer.extend(extensions.ProgressBar(update_interval=1))
-
-        # set mode.train = False right before evaluation starts,
-        # then re-set it to True right after evaluation ends,
-        trainer.extend(lambda x: model.predictor.enable_layer_output(), trigger=(5, "epoch"), priority=training.extension.PRIORITY_WRITER + 1)
-        trainer.extend(lambda x: model.predictor.disable_layer_output(), trigger=(5, "epoch"), priority=training.extension.PRIORITY_READER - 1)
 
         # Run the training
         trainer.run()
