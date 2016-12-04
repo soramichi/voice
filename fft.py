@@ -5,25 +5,66 @@ import pickle
 import functools
 import numpy as np
 
-base_dir = sys.argv[1]
-dir = base_dir + "/cut"
+def get_target_dirs(base_dir = "./data"):
+    dirs = os.listdir(base_dir)
+    targets = []
 
-filelist = os.listdir(dir)
+    for d in dirs:
+        cut_dir = ("%s/%s/cut" % (base_dir, d))
 
-for i in range(0, len(filelist)):
-    f = filelist[i]
+        try:
+            s = os.stat(cut_dir)
+        except FileNotFoundError:
+            print("Error: %s does not include 'cut' directory" % d)
+            sys.exit(1)
+
+        if len(os.listdir(cut_dir)) == 0:
+            print("Error: %s does not include data files." % cut_dir)
+        else:
+            targets.append("%s/%s" % (base_dir, d))
+
+    return targets
+
+def fft(target_dir, output_dir):
+    basename = target_dir.split("/")[-1]
+    target_dir += "/cut"
+    filelist = os.listdir(target_dir)
+
+    print(target_dir, output_dir)
+    print(basename)
+
+    f_out = open("%s/%s.batch" % (output_dir, basename), "w")
+
+    for i in range(0, len(filelist)):
+        f = filelist[i]
     
-    sys.stderr.write("%s (%d/%d)\n" % (f, i+1, len(filelist)))
-    
-    w = wave.open("%s/%s" % (dir, f), "rb")
-    fs = w.getframerate()
+        sys.stderr.write("%s (%d/%d)\n" % (f, i+1, len(filelist)))
 
-    x = w.readframes(w.getnframes())
-    x = np.frombuffer(x, dtype= "int16") / 32768.0
+        w = wave.open("%s/%s" % (target_dir, f), "rb")
+        fs = w.getframerate()
 
-    X = np.fft.fft(x)
-    data = functools.reduce(lambda l,c: np.append(l, np.array([c.real, c.imag]).astype(np.float16)), X, np.array([]))
+        x = w.readframes(w.getnframes())
+        x = np.frombuffer(x, dtype= "int16") / 32768.0
 
-    # save only up to 15kHz
-    # Note: one Hz has two data elements (real and imaginary parts)
-    sys.stdout.write("%s, %s\n" % (dir + "/" + f, list(data[0:30000]).__str__()[1:-1]))
+        X = np.fft.fft(x)
+        data = functools.reduce(lambda l,c: np.append(l, np.array([c.real, c.imag]).astype(np.float16)), X, np.array([]))
+
+        # save only up to 15kHz
+        # Note: one Hz has two data elements (real and imaginary parts)
+        f_out.write("%s, %s\n" % (target_dir + "/" + f, list(data[0:30000]).__str__()[1:-1]))
+        f_out.flush()
+
+def main():
+    data_batch_dir = "./data_batch"
+
+    try:
+        s = os.stat(data_batch_dir)
+    except FileNotFoundError:
+        os.mkdir(data_batch_dir)
+
+    target_dirs = get_target_dirs()
+    for d in target_dirs:
+        fft(d, data_batch_dir)
+
+if __name__ == "__main__":
+    main()
